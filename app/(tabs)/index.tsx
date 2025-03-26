@@ -1,74 +1,119 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+} from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const Home = () => {
+  const router = useRouter();
+  const [team, setTeam] = useState<string | null>(null);
 
-export default function HomeScreen() {
+  const selectTeam = async (selectedTeam: string) => {
+    setTeam(selectedTeam);
+    await AsyncStorage.setItem("selectedTeam", selectedTeam);
+    router.push({
+      pathname: "/(tabs)/clicker",
+      params: { team: selectedTeam }, // Pass the selected team as a parameter
+    });
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.teamSelectionContainer}>
+      <Text style={styles.title}>Choose your team!</Text>
+      <View style={styles.teamButtonContainer}>
+        <TouchableOpacity
+          style={[styles.teamButton, styles.blueTeam]}
+          onPress={() => selectTeam("blue")}
+        >
+          <Text style={styles.teamButtonText}>Blue Team</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.teamButton, styles.redTeam]}
+          onPress={() => selectTeam("red")}
+        >
+          <Text style={styles.teamButtonText}>Red Team</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: "#000000",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  teamSelectionContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  title: {
+    fontSize: 24,
+    marginBottom: 20,
+    fontWeight: "bold",
+    color: "white",
+  },
+  teamButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  teamButton: {
+    padding: 20,
+    margin: 10,
+    borderRadius: 10,
+  },
+  blueTeam: {
+    backgroundColor: "#3498db",
+  },
+  redTeam: {
+    backgroundColor: "#e74c3c",
+  },
+  teamButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  progressBar: {
+    height: 20,
+    flexDirection: "row",
+    width: "100%",
+  },
+  progressBarBlue: {
+    backgroundColor: "#3498db",
+    height: "100%",
+  },
+  progressBarRed: {
+    backgroundColor: "#e74c3c",
+    height: "100%",
+  },
+  statsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    padding: 10,
+  },
+  statsText: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  clickButton: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    margin: 20,
+    borderRadius: 10,
+    padding: 20,
+  },
+  clickButtonText: {
+    color: "white",
+    fontSize: 20,
+    fontWeight: "bold",
   },
 });
+
+export default Home;
