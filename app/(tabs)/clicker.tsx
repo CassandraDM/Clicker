@@ -1,15 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   SafeAreaView,
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../constants/firebaseConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BlurView } from "expo-blur";
+
+const { width, height } = Dimensions.get("window");
 
 export default function Clicker() {
   const { team, username, userId } = useLocalSearchParams();
@@ -18,7 +23,75 @@ export default function Clicker() {
   const [personalClicks, setPersonalClicks] = useState(0);
   const [storedUsername, setStoredUsername] = useState("");
   const [storedUserId, setStoredUserId] = useState("");
-  const [storedTeam, setStoredTeam] = useState("");
+  const [storedTeam, setStoredTeam] = useState<"blue" | "red">("blue");
+
+  // Animated values for circle movement
+  const circle1X = useRef(new Animated.Value(0)).current;
+  const circle1Y = useRef(new Animated.Value(0)).current;
+  const circle2X = useRef(new Animated.Value(0)).current;
+  const circle2Y = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Animate first circle
+    const circle1Animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(circle1X, {
+          toValue: 50,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(circle1Y, {
+          toValue: 50,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(circle1X, {
+          toValue: 0,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(circle1Y, {
+          toValue: 0,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Animate second circle
+    const circle2Animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(circle2X, {
+          toValue: -50,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(circle2Y, {
+          toValue: -50,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(circle2X, {
+          toValue: 0,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(circle2Y, {
+          toValue: 0,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    circle1Animation.start();
+    circle2Animation.start();
+
+    return () => {
+      circle1Animation.stop();
+      circle2Animation.stop();
+    };
+  }, []);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -37,7 +110,11 @@ export default function Clicker() {
           savedUserId,
         });
 
-        setStoredTeam(savedTeam);
+        if (savedTeam === "blue" || savedTeam === "red") {
+          setStoredTeam(savedTeam as "blue" | "red");
+        } else {
+          console.error("Invalid team value:", savedTeam);
+        }
         setStoredUsername(savedUsername);
         setStoredUserId(savedUserId);
 
@@ -72,7 +149,6 @@ export default function Clicker() {
         });
 
         // Always set personal clicks, even if the document doesn't exist
-        // This ensures a new user starts with 0 clicks
         const userData = userDocSnap.data();
         const personalClickValue = userData
           ? parseInt(userData.personalClick || "0", 10)
@@ -162,8 +238,67 @@ export default function Clicker() {
     }
   };
 
+  // Determine team colors
+  const teamColors = {
+    blue: {
+      primary: "rgba(52, 152, 219, 0.3)",
+      secondary: "rgba(41, 128, 185, 0.3)",
+    },
+    red: {
+      primary: "rgba(231, 76, 60, 0.3)",
+      secondary: "rgba(192, 57, 43, 0.3)",
+    },
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Animated Background Circles */}
+      <Animated.View
+        style={[
+          {
+            transform: [{ translateX: circle1X }, { translateY: circle1Y }],
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.backgroundCircle,
+            {
+              backgroundColor:
+                teamColors[storedTeam]?.primary || teamColors.blue.primary,
+            },
+          ]}
+        >
+          <BlurView
+            intensity={50}
+            style={StyleSheet.absoluteFill}
+            tint="dark"
+          />
+        </View>
+      </Animated.View>
+      <Animated.View
+        style={[
+          {
+            transform: [{ translateX: circle2X }, { translateY: circle2Y }],
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.backgroundCircle,
+            {
+              backgroundColor: teamColors[storedTeam]?.secondary,
+            },
+          ]}
+        >
+          <BlurView
+            intensity={50}
+            style={StyleSheet.absoluteFill}
+            tint="dark"
+          />
+        </View>
+      </Animated.View>
+
       {/* User Info */}
       <View style={styles.userInfoContainer}>
         <Text style={styles.userInfoText}>Welcome, {storedUsername}!</Text>
@@ -192,8 +327,14 @@ export default function Clicker() {
 
       {/* Statistics */}
       <View style={styles.statsContainer}>
-        <Text style={styles.statsText}>{blueClicks}</Text>
-        <Text style={styles.statsText}>{redClicks}</Text>
+        <Text style={styles.blueStatsText}>
+          {blueClicks} (
+          {((blueClicks / (blueClicks + redClicks || 1)) * 100).toFixed(1)}%)
+        </Text>
+        <Text style={styles.redStatsText}>
+          {redClicks} (
+          {((redClicks / (blueClicks + redClicks || 1)) * 100).toFixed(1)}%)
+        </Text>
       </View>
 
       {/* Click Button */}
@@ -217,7 +358,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     justifyContent: "center",
     alignItems: "center",
+    position: "relative",
+    overflow: "hidden",
   },
+
+  backgroundCircle: {
+    position: "absolute",
+    width: 300,
+    height: 300,
+    borderRadius: 200,
+    opacity: 1,
+    overflow: "hidden",
+  },
+
   userInfoContainer: {
     width: "100%",
     flexDirection: "row",
@@ -273,10 +426,15 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     paddingHorizontal: 10,
   },
-  statsText: {
+  blueStatsText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#ecf0f1",
+    color: "#2980b9",
+  },
+  redStatsText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#c0392b",
   },
   clickButton: {
     justifyContent: "center",

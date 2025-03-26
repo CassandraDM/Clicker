@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,16 +7,86 @@ import {
   SafeAreaView,
   TextInput,
   Alert,
+  Animated,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { doc, setDoc, collection } from "firebase/firestore";
 import { db } from "../../constants/firebaseConfig";
+import { BlurView } from "expo-blur";
 
 const Home = () => {
   const router = useRouter();
-  const [team, setTeam] = useState<string | null>(null);
-  const [username, setUsername] = useState<string>("");
+  const [team, setTeam] = React.useState<string | null>(null);
+  const [username, setUsername] = React.useState<string>("");
+
+  // Animated values for circle movement
+  const blueCircleX = useRef(new Animated.Value(0)).current;
+  const blueCircleY = useRef(new Animated.Value(0)).current;
+  const redCircleX = useRef(new Animated.Value(0)).current;
+  const redCircleY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Animate blue circle
+    const blueCircleAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blueCircleX, {
+          toValue: 50,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blueCircleY, {
+          toValue: 50,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blueCircleX, {
+          toValue: 0,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blueCircleY, {
+          toValue: 0,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Animate red circle
+    const redCircleAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(redCircleX, {
+          toValue: -50,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(redCircleY, {
+          toValue: -50,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(redCircleX, {
+          toValue: 0,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(redCircleY, {
+          toValue: 0,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    blueCircleAnimation.start();
+    redCircleAnimation.start();
+
+    return () => {
+      blueCircleAnimation.stop();
+      redCircleAnimation.stop();
+    };
+  }, []);
 
   const handleGo = async () => {
     if (team && username.trim()) {
@@ -70,6 +140,33 @@ const Home = () => {
 
   return (
     <SafeAreaView style={styles.teamSelectionContainer}>
+      {/* Animated Background Circles */}
+      <Animated.View
+        style={[
+          styles.backgroundCircle,
+          styles.blueCircle,
+          {
+            transform: [
+              { translateX: blueCircleX },
+              { translateY: blueCircleY },
+            ],
+          },
+        ]}
+      >
+        <BlurView intensity={50} style={StyleSheet.absoluteFill} />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.backgroundCircle,
+          styles.redCircle,
+          {
+            transform: [{ translateX: redCircleX }, { translateY: redCircleY }],
+          },
+        ]}
+      >
+        <BlurView intensity={50} style={StyleSheet.absoluteFill} />
+      </Animated.View>
+
       <Text style={styles.title}>Choose your team!</Text>
       <View style={styles.teamButtonContainer}>
         <TouchableOpacity
@@ -100,10 +197,6 @@ const Home = () => {
         value={username}
         onChangeText={setUsername}
       />
-      <Text style={styles.note}>
-        Note: If you create a new user, you will not be able to access your old
-        user data. So be careful! 😉
-      </Text>
       <TouchableOpacity style={styles.goButton} onPress={handleGo}>
         <Text style={styles.goButtonText}>Go!</Text>
       </TouchableOpacity>
@@ -112,14 +205,35 @@ const Home = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000000",
-  },
   teamSelectionContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#000000",
+    position: "relative",
+    overflow: "hidden",
+  },
+  backgroundCircle: {
+    position: "absolute",
+    width: 300,
+    height: 300,
+    borderRadius: 200,
+    opacity: 0.3,
+    overflow: "hidden",
+  },
+  blueCircle: {
+    backgroundColor: "rgba(52, 152, 219, 1)",
+    top: -100,
+    left: -100,
+  },
+  redCircle: {
+    backgroundColor: "rgba(231, 76, 60, 1)",
+    bottom: -80,
+    right: -100,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: "#000000",
   },
   title: {
     fontSize: 24,
