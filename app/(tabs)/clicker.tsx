@@ -5,20 +5,43 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Platform,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../constants/firebaseConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Clicker() {
-  const { team } = useLocalSearchParams();
+  const { team, username, userId } = useLocalSearchParams();
   const [blueClicks, setBlueClicks] = useState(0);
   const [redClicks, setRedClicks] = useState(0);
+  const [personalClicks, setPersonalClicks] = useState(0);
+  const [storedUsername, setStoredUsername] = useState("");
+  const [storedUserId, setStoredUserId] = useState("");
+  const [storedTeam, setStoredTeam] = useState("");
 
   useEffect(() => {
-    const fetchClicks = async () => {
+    const fetchInitialData = async () => {
       try {
+        // Prioritize passed parameters, then stored values
+        const savedTeam = (team ||
+          (await AsyncStorage.getItem("userTeam"))) as string;
+        const savedUsername = (username ||
+          (await AsyncStorage.getItem("username"))) as string;
+        const savedUserId = (userId ||
+          (await AsyncStorage.getItem("userId"))) as string;
+
+        console.log("Fetched Data:", {
+          savedTeam,
+          savedUsername,
+          savedUserId,
+        });
+
+        setStoredTeam(savedTeam);
+        setStoredUsername(savedUsername);
+        setStoredUserId(savedUserId);
+
+        // Fetch team clicks
         const blueDocRef = doc(db, "interactions", "blue");
         const redDocRef = doc(db, "interactions", "red");
 
@@ -32,42 +55,107 @@ export default function Clicker() {
         if (redDocSnap.exists()) {
           setRedClicks(parseInt(redDocSnap.data().click || "0", 10));
         }
+
+        // Fetch user-specific data
+        const userDocRef = doc(
+          db,
+          "interactions",
+          savedTeam,
+          "user",
+          savedUserId
+        );
+        const userDocSnap = await getDoc(userDocRef);
+
+        console.log("User Document:", {
+          exists: userDocSnap.exists(),
+          data: userDocSnap.data(),
+        });
+
+        // Always set personal clicks, even if the document doesn't exist
+        // This ensures a new user starts with 0 clicks
+        const userData = userDocSnap.data();
+        const personalClickValue = userData
+          ? parseInt(userData.personalClick || "0", 10)
+          : 0;
+
+        setStoredUsername(userData?.name || savedUsername);
+        setPersonalClicks(personalClickValue);
+
+        // If the document doesn't exist, create it
+        if (!userDocSnap.exists()) {
+          await setDoc(userDocRef, {
+            name: savedUsername,
+            personalClick: "0",
+            team: savedTeam,
+            createdAt: new Date().toISOString(),
+          });
+        }
       } catch (error) {
-        console.error("Error fetching click data:", error);
+        console.error("Error fetching data:", error);
       }
     };
 
-    fetchClicks();
-  }, []);
+    fetchInitialData();
+  }, [team, username, userId]);
 
   const handleClick = async () => {
     try {
-      const docRef = doc(db, "interactions", team as string);
-      const docSnap = await getDoc(docRef);
+      // Update team clicks
+      const teamDocRef = doc(db, "interactions", storedTeam);
+      const teamDocSnap = await getDoc(teamDocRef);
 
-      if (docSnap.exists()) {
-        const currentClicks = parseInt(docSnap.data().click || "0", 10);
-        await updateDoc(docRef, {
-          click: (currentClicks + 1).toString(),
+      if (teamDocSnap.exists()) {
+        const currentTeamClicks = parseInt(teamDocSnap.data().click || "0", 10);
+        await updateDoc(teamDocRef, {
+          click: (currentTeamClicks + 1).toString(),
         });
 
-        if (team === "blue") {
-          setBlueClicks(currentClicks + 1);
-        } else if (team === "red") {
-          setRedClicks(currentClicks + 1);
+        if (storedTeam === "blue") {
+          setBlueClicks(currentTeamClicks + 1);
+        } else if (storedTeam === "red") {
+          setRedClicks(currentTeamClicks + 1);
         }
       } else {
-        await setDoc(docRef, {
+        await setDoc(teamDocRef, {
           click: "1",
-          team: team,
+          team: storedTeam,
         });
 
-        // Update the local state
-        if (team === "blue") {
+        if (storedTeam === "blue") {
           setBlueClicks(1);
-        } else if (team === "red") {
+        } else if (storedTeam === "red") {
           setRedClicks(1);
         }
+      }
+
+      // Update personal clicks
+      const userDocRef = doc(
+        db,
+        "interactions",
+        storedTeam,
+        "user",
+        storedUserId
+      );
+      const userDocSnap = await getDoc(userDocRef);
+
+      // Ensure the user document exists before updating
+      if (!userDocSnap.exists()) {
+        await setDoc(userDocRef, {
+          name: storedUsername,
+          personalClick: "1",
+          team: storedTeam,
+          createdAt: new Date().toISOString(),
+        });
+        setPersonalClicks(1);
+      } else {
+        const currentPersonalClicks = parseInt(
+          userDocSnap.data().personalClick || "0",
+          10
+        );
+        await updateDoc(userDocRef, {
+          personalClick: (currentPersonalClicks + 1).toString(),
+        });
+        setPersonalClicks(currentPersonalClicks + 1);
       }
     } catch (error) {
       console.error("Error updating document:", error);
@@ -76,6 +164,12 @@ export default function Clicker() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* User Info */}
+      <View style={styles.userInfoContainer}>
+        <Text style={styles.userInfoText}>Welcome, {storedUsername}!</Text>
+        <Text style={styles.userInfoText}>Your Clicks: {personalClicks}</Text>
+      </View>
+
       {/* Progress Bar */}
       <View style={styles.progressBar}>
         <View
@@ -106,7 +200,7 @@ export default function Clicker() {
       <TouchableOpacity
         style={[
           styles.clickButton,
-          team === "blue" ? styles.blueTeam : styles.redTeam,
+          storedTeam === "blue" ? styles.blueTeam : styles.redTeam,
         ]}
         onPress={handleClick}
       >
@@ -124,6 +218,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  userInfoContainer: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  userInfoText: {
+    color: "#ecf0f1",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   progressBar: {
     height: 30,
     flexDirection: "row",
@@ -133,7 +239,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1a1a1a",
   },
   progressBarBlue: {
-    backgroundColor: "#3498db", // Single, consolidated backgroundColor
+    backgroundColor: "#3498db",
     height: 30,
     shadowColor: "#3498db",
     shadowOffset: { width: 0, height: 0 },
@@ -144,7 +250,7 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   progressBarRed: {
-    backgroundColor: "#e74c3c", // Single, consolidated backgroundColor
+    backgroundColor: "#e74c3c",
     height: 30,
     shadowColor: "#e74c3c",
     shadowOffset: { width: 0, height: 0 },
