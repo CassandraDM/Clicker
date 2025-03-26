@@ -197,6 +197,10 @@ const Home = () => {
         value={username}
         onChangeText={setUsername}
       />
+      <Text style={styles.note}>
+        Note: If create a next user, you will no longer have access to your
+        previous user data. So be careful! 😉
+      </Text>
       <TouchableOpacity style={styles.goButton} onPress={handleGo}>
         <Text style={styles.goButtonText}>Go!</Text>
       </TouchableOpacity>
